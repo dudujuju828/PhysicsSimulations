@@ -156,10 +156,10 @@ static void draw_scene(AppState& app) {
     // --- Text ---
     float s = kTextScale;
 
-    // "Euler" label (top of left half)
+    // "Forward Euler" label (top of left half)
     {
-        float tw = stb_easy_font_width(const_cast<char*>("Euler")) * s;
-        r.draw_text("Euler", w * 0.25f - tw * 0.5f, 20.0f, s,
+        float tw = stb_easy_font_width(const_cast<char*>("Forward Euler")) * s;
+        r.draw_text("Forward Euler", w * 0.25f - tw * 0.5f, 20.0f, s,
                     0.3f, 0.6f, 1.0f, w, h);
     }
 

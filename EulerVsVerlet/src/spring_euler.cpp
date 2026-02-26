@@ -12,8 +12,10 @@ void SpringEuler::reset(Vec2 anchor, Vec2 offset, float stiffness, float mass) {
 void SpringEuler::step(float dt) {
     Vec2 displacement = pos_ - anchor_;
     Vec2 accel = displacement * (-k_ / mass_);
-    vel_ += accel * dt;
-    pos_ += vel_ * dt;
+    Vec2 new_vel = vel_ + accel * dt;
+    Vec2 new_pos = pos_ + vel_ * dt;
+    vel_ = new_vel;
+    pos_ = new_pos;
     trail_.push(pos_);
 }
 
