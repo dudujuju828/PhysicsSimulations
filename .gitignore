@@ -1,2 +1,29 @@
 .*
 !.gitignore
+
+# CMake
+build/
+out/
+CMakeUserPresets.json
+
+# MSVC / Visual Studio
+*.vcxproj.user
+*.suo
+*.sdf
+*.opensdf
+*.db
+*.opendb
+*.ipch
+
+# Compiled objects / binaries
+*.obj
+*.o
+*.lib
+*.a
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+*.ilk
+*.exp
