@@ -14,4 +14,4 @@ A rope/chain simulation where particles are connected by distance constraints an
 
 Built with C++20, OpenGL 4.6, and GLFW.
 
-<video src="VerletIntegration.mp4" width="600" controls></video>
+<video src="VerletChain/media/demo.mp4" width="600" controls></video>
