@@ -65,12 +65,12 @@ std::size_t Chain::find_nearest(Vec2 pos, float max_dist) const {
 }
 
 void Chain::integrate(float dt, Vec2 gravity) {
-    Vec2 accel = gravity * (dt * dt);
+    Vec2 gravity_step = gravity * (dt * dt);
     for (auto& p : particles_) {
         if (p.pinned) continue;
-        Vec2 vel = p.pos - p.prev_pos;
+        Vec2 displacement = p.pos - p.prev_pos;
         p.prev_pos = p.pos;
-        p.pos = p.pos + vel + accel;
+        p.pos = p.pos + displacement + gravity_step;
     }
 }
 
