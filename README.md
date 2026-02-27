@@ -7,6 +7,7 @@ A collection of standalone physics simulation experiments, each in its own folde
 | Project | Description |
 |---------|-------------|
 | [VerletChain](VerletChain/) | 2D particle chain driven by Verlet integration with mouse interaction |
+| [EulerVsVerlet](EulerVsVerlet/) | Side-by-side spring sim comparing Forward Euler and Verlet integration |
 
 ## VerletChain
 
