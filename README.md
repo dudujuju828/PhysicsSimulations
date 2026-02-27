@@ -8,6 +8,7 @@ A collection of standalone physics simulation experiments, each in its own folde
 |---------|-------------|
 | [VerletChain](VerletChain/) | 2D particle chain driven by Verlet integration with mouse interaction |
 | [EulerVsVerlet](EulerVsVerlet/) | Side-by-side spring sim comparing Forward Euler and Verlet integration |
+| [QuaternionVis](QuaternionVis/) | 3D quaternion rotation visualizer comparing SLERP and LERP interpolation |
 
 ## VerletChain
 
