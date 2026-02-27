@@ -1,17 +1,19 @@
 #include "spring_euler.h"
 
-void SpringEuler::reset(Vec2 anchor, Vec2 offset, float stiffness, float mass) {
-    anchor_ = anchor;
-    pos_    = anchor + offset;
-    vel_    = {0.0f, 0.0f};
-    k_      = stiffness;
-    mass_   = mass;
+void SpringEuler::reset(Vec2 anchor, Vec2 offset, float stiffness, float mass,
+                        float damping) {
+    anchor_  = anchor;
+    pos_     = anchor + offset;
+    vel_     = {0.0f, 0.0f};
+    k_       = stiffness;
+    mass_    = mass;
+    damping_ = damping;
     trail_.clear();
 }
 
 void SpringEuler::step(float dt) {
     Vec2 displacement = pos_ - anchor_;
-    Vec2 accel = displacement * (-k_ / mass_);
+    Vec2 accel = displacement * (-k_ / mass_) + vel_ * (-damping_ / mass_);
     Vec2 new_vel = vel_ + accel * dt;
     Vec2 new_pos = pos_ + vel_ * dt;
     vel_ = new_vel;

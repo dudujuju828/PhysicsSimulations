@@ -3,7 +3,8 @@
 
 class SpringEuler {
 public:
-    void reset(Vec2 anchor, Vec2 offset, float stiffness, float mass);
+    void reset(Vec2 anchor, Vec2 offset, float stiffness, float mass,
+               float damping = 0.0f);
     void step(float dt);
 
     Vec2  pos()    const { return pos_; }
@@ -17,7 +18,8 @@ private:
     Vec2  anchor_ = {};
     Vec2  pos_    = {};
     Vec2  vel_    = {};
-    float k_      = 0.0f;
-    float mass_   = 1.0f;
+    float k_       = 0.0f;
+    float mass_    = 1.0f;
+    float damping_ = 0.0f;
     Trail trail_;
 };

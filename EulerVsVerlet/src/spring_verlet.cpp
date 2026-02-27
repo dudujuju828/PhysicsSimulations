@@ -1,11 +1,13 @@
 #include "spring_verlet.h"
 
-void SpringVerlet::reset(Vec2 anchor, Vec2 offset, float stiffness, float mass) {
+void SpringVerlet::reset(Vec2 anchor, Vec2 offset, float stiffness, float mass,
+                         float damping) {
     anchor_   = anchor;
     pos_      = anchor + offset;
     prev_pos_ = pos_;
     k_        = stiffness;
     mass_     = mass;
+    damping_  = damping;
     trail_.clear();
 }
 
@@ -14,8 +16,9 @@ void SpringVerlet::step(float dt) {
     Vec2 d = pos_ - anchor_;
     Vec2 accel = d * (-k_ / mass_);
 
+    float damp = 1.0f - damping_ / mass_ * dt;
     prev_pos_ = pos_;
-    pos_ = pos_ + displacement + accel * (dt * dt);
+    pos_ = pos_ + displacement * damp + accel * (dt * dt);
     trail_.push(pos_);
 }
 

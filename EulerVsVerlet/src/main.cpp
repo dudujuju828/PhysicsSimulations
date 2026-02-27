@@ -14,7 +14,7 @@
 
 // --- Simulation parameters ---
 constexpr int   kInitialWidth   = 1200;
-constexpr int   kInitialHeight  = 700;
+constexpr int   kInitialHeight  = 675;
 constexpr float kMaxFrameDt     = 0.1f;
 constexpr float kPresetDuration = 6.0f;
 constexpr float kMass           = 1.0f;
@@ -26,21 +26,23 @@ struct Preset {
     float k;
     Vec2 offset;
     float dt;
+    float damping;
 };
 
 static constexpr Preset kPresets[] = {
-    {"Gentle Spring",     4.0f,   {80.0f,  0.0f}, 1.0f / 60.0f},
-    {"Stiff Spring",      50.0f,  {80.0f,  0.0f}, 1.0f / 60.0f},
-    {"Very Stiff Spring", 200.0f, {80.0f,  0.0f}, 1.0f / 60.0f},
-    {"Large Timestep",    20.0f,  {80.0f,  0.0f}, 1.0f / 20.0f},
-    {"Diagonal Launch",   20.0f,  {60.0f, 60.0f}, 1.0f / 60.0f},
+    {"Gentle Spring",     4.0f,   {80.0f,  0.0f}, 1.0f / 60.0f, 0.8f},
+    {"Stiff Spring",      50.0f,  {80.0f,  0.0f}, 1.0f / 60.0f, 1.5f},
+    {"Large Timestep",    20.0f,  {80.0f,  0.0f}, 1.0f / 20.0f, 1.2f},
+    {"Diagonal Launch",   20.0f,  {60.0f, 60.0f}, 1.0f / 60.0f, 1.2f},
 };
 constexpr int kNumPresets = sizeof(kPresets) / sizeof(kPresets[0]);
 
 // --- Application state ---
 struct AppState {
-    SpringEuler  euler;
-    SpringVerlet verlet;
+    SpringEuler  euler;           // top-left, no damping
+    SpringVerlet verlet;          // top-right, no damping
+    SpringEuler  euler_damped;    // bottom-left, damped
+    SpringVerlet verlet_damped;   // bottom-right, damped
     Renderer     renderer;
 
     int   win_width    = kInitialWidth;
@@ -51,20 +53,22 @@ struct AppState {
     bool  paused       = false;
 };
 
-static Vec2 euler_anchor(int w, int h) {
-    return {w * 0.25f, h * 0.5f};
-}
-
-static Vec2 verlet_anchor(int w, int h) {
-    return {w * 0.75f, h * 0.5f};
-}
+// Anchor positions for the four quadrants
+static Vec2 anchor_top_left(int w, int h)     { return {w * 0.25f, h * 0.75f}; }
+static Vec2 anchor_top_right(int w, int h)    { return {w * 0.75f, h * 0.75f}; }
+static Vec2 anchor_bottom_left(int w, int h)  { return {w * 0.25f, h * 0.25f}; }
+static Vec2 anchor_bottom_right(int w, int h) { return {w * 0.75f, h * 0.25f}; }
 
 static void reset_preset(AppState& app) {
     const Preset& p = kPresets[app.preset_index];
-    app.euler.reset(euler_anchor(app.win_width, app.win_height),
-                    p.offset, p.k, kMass);
-    app.verlet.reset(verlet_anchor(app.win_width, app.win_height),
-                     p.offset, p.k, kMass);
+    int w = app.win_width;
+    int h = app.win_height;
+
+    app.euler.reset(anchor_top_left(w, h), p.offset, p.k, kMass, 0.0f);
+    app.verlet.reset(anchor_top_right(w, h), p.offset, p.k, kMass, 0.0f);
+    app.euler_damped.reset(anchor_bottom_left(w, h), p.offset, p.k, kMass, p.damping);
+    app.verlet_damped.reset(anchor_bottom_right(w, h), p.offset, p.k, kMass, p.damping);
+
     app.accumulator  = 0.0f;
     app.preset_timer = 0.0f;
 }
@@ -104,66 +108,107 @@ static void key_callback(GLFWwindow* window, int key, int /*scancode*/,
 
 // --- Drawing -----------------------------------------------------------------
 
+// Draw a single sim quadrant: trail, spring line, anchor, ball, energy text.
+// ball_r/g/b and trail_r/g/b set the colors. energy_y is the screen-y for
+// the energy readout text.
+struct QuadrantInfo {
+    Vec2  anchor;
+    Vec2  pos;
+    const Trail* trail;
+    float ball_r, ball_g, ball_b;
+    float trail_r, trail_g, trail_b;
+    float energy;
+    float center_x;   // horizontal center of this quadrant
+    float energy_y;    // screen-y for the energy readout
+};
+
+static void draw_quadrant(Renderer& r, const QuadrantInfo& q, int w, int h) {
+    float s = kTextScale;
+
+    // Trail
+    Vec2 trail_buf[Trail::kCapacity];
+    std::size_t n = q.trail->extract(trail_buf);
+    if (n >= 2)
+        r.draw_line_strip({trail_buf, n}, q.trail_r, q.trail_g, q.trail_b, 0.3f, w, h);
+
+    // Spring line
+    Vec2 spring[2] = {q.anchor, q.pos};
+    r.draw_lines({spring, 2}, 0.5f, 0.5f, 0.5f, 1.0f, w, h);
+
+    // Anchor
+    r.draw_points({&q.anchor, 1}, 6.0f, 0.8f, 0.8f, 0.8f, w, h);
+
+    // Ball
+    r.draw_points({&q.pos, 1}, 12.0f, q.ball_r, q.ball_g, q.ball_b, w, h);
+
+    // Energy readout
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "E = %.1f", q.energy);
+    float tw = stb_easy_font_width(buf) * s;
+    r.draw_text(buf, q.center_x - tw * 0.5f, q.energy_y, s,
+                0.7f, 0.7f, 0.7f, w, h);
+}
+
 static void draw_scene(AppState& app) {
     int w = app.win_width;
     int h = app.win_height;
     const Preset& preset = kPresets[app.preset_index];
     Renderer& r = app.renderer;
-
-    // Vertical divider
-    Vec2 divider[2] = {{w * 0.5f, 0.0f}, {w * 0.5f, static_cast<float>(h)}};
-    r.draw_lines({divider, 2}, 0.3f, 0.3f, 0.3f, 1.0f, w, h);
-
-    // --- Euler side (left) ---
-    {
-        Vec2 anchor = app.euler.anchor();
-        Vec2 pos    = app.euler.pos();
-
-        // Trail
-        Vec2 trail_buf[Trail::kCapacity];
-        std::size_t n = app.euler.trail().extract(trail_buf);
-        if (n >= 2)
-            r.draw_line_strip({trail_buf, n}, 0.3f, 0.5f, 1.0f, 0.3f, w, h);
-
-        // Spring line
-        Vec2 spring[2] = {anchor, pos};
-        r.draw_lines({spring, 2}, 0.5f, 0.5f, 0.5f, 1.0f, w, h);
-
-        // Anchor
-        r.draw_points({&anchor, 1}, 6.0f, 0.8f, 0.8f, 0.8f, w, h);
-
-        // Ball
-        r.draw_points({&pos, 1}, 12.0f, 0.3f, 0.6f, 1.0f, w, h);
-    }
-
-    // --- Verlet side (right) ---
-    {
-        Vec2 anchor = app.verlet.anchor();
-        Vec2 pos    = app.verlet.pos();
-
-        Vec2 trail_buf[Trail::kCapacity];
-        std::size_t n = app.verlet.trail().extract(trail_buf);
-        if (n >= 2)
-            r.draw_line_strip({trail_buf, n}, 1.0f, 0.5f, 0.3f, 0.3f, w, h);
-
-        Vec2 spring[2] = {anchor, pos};
-        r.draw_lines({spring, 2}, 0.5f, 0.5f, 0.5f, 1.0f, w, h);
-
-        r.draw_points({&anchor, 1}, 6.0f, 0.8f, 0.8f, 0.8f, w, h);
-        r.draw_points({&pos, 1}, 12.0f, 1.0f, 0.5f, 0.2f, w, h);
-    }
-
-    // --- Text ---
     float s = kTextScale;
 
-    // "Forward Euler" label (top of left half)
+    // --- Dividers ---
+    // Vertical divider
+    Vec2 vdiv[2] = {{w * 0.5f, 0.0f}, {w * 0.5f, static_cast<float>(h)}};
+    r.draw_lines({vdiv, 2}, 0.3f, 0.3f, 0.3f, 1.0f, w, h);
+
+    // Horizontal divider
+    Vec2 hdiv[2] = {{0.0f, h * 0.5f}, {static_cast<float>(w), h * 0.5f}};
+    r.draw_lines({hdiv, 2}, 0.3f, 0.3f, 0.3f, 1.0f, w, h);
+
+    // --- Draw 4 quadrants ---
+    // Euler colors: ball (0.3, 0.6, 1.0), trail (0.3, 0.5, 1.0)
+    // Verlet colors: ball (1.0, 0.5, 0.2), trail (1.0, 0.5, 0.3)
+
+    // Top-left: Euler, no damping
+    draw_quadrant(r, {
+        app.euler.anchor(), app.euler.pos(), &app.euler.trail(),
+        0.3f, 0.6f, 1.0f,   0.3f, 0.5f, 1.0f,
+        app.euler.energy(),
+        w * 0.25f, h * 0.5f - 60.0f
+    }, w, h);
+
+    // Top-right: Verlet, no damping
+    draw_quadrant(r, {
+        app.verlet.anchor(), app.verlet.pos(), &app.verlet.trail(),
+        1.0f, 0.5f, 0.2f,   1.0f, 0.5f, 0.3f,
+        app.verlet.energy(preset.dt),
+        w * 0.75f, h * 0.5f - 60.0f
+    }, w, h);
+
+    // Bottom-left: Euler, damped
+    draw_quadrant(r, {
+        app.euler_damped.anchor(), app.euler_damped.pos(), &app.euler_damped.trail(),
+        0.3f, 0.6f, 1.0f,   0.3f, 0.5f, 1.0f,
+        app.euler_damped.energy(),
+        w * 0.25f, static_cast<float>(h) - 60.0f
+    }, w, h);
+
+    // Bottom-right: Verlet, damped
+    draw_quadrant(r, {
+        app.verlet_damped.anchor(), app.verlet_damped.pos(), &app.verlet_damped.trail(),
+        1.0f, 0.5f, 0.2f,   1.0f, 0.5f, 0.3f,
+        app.verlet_damped.energy(preset.dt),
+        w * 0.75f, static_cast<float>(h) - 60.0f
+    }, w, h);
+
+    // --- Text labels ---
+
+    // Column labels at very top
     {
         float tw = stb_easy_font_width(const_cast<char*>("Forward Euler")) * s;
         r.draw_text("Forward Euler", w * 0.25f - tw * 0.5f, 20.0f, s,
                     0.3f, 0.6f, 1.0f, w, h);
     }
-
-    // "Verlet" label (top of right half)
     {
         float tw = stb_easy_font_width(const_cast<char*>("Verlet")) * s;
         r.draw_text("Verlet", w * 0.75f - tw * 0.5f, 20.0f, s,
@@ -177,21 +222,18 @@ static void draw_scene(AppState& app) {
                     0.9f, 0.9f, 0.9f, w, h);
     }
 
-    // Energy readouts
-    char buf[64];
-
-    std::snprintf(buf, sizeof(buf), "E = %.1f", app.euler.energy());
+    // Row labels
     {
-        float tw = stb_easy_font_width(buf) * s;
-        r.draw_text(buf, w * 0.25f - tw * 0.5f, h * 0.5f + 100.0f, s,
-                    0.7f, 0.7f, 0.7f, w, h);
+        const char* label = "No Damping";
+        float tw = stb_easy_font_width(const_cast<char*>(label)) * s;
+        r.draw_text(label, w * 0.5f - tw * 0.5f, 38.0f, s,
+                    0.6f, 0.6f, 0.6f, w, h);
     }
-
-    std::snprintf(buf, sizeof(buf), "E = %.1f", app.verlet.energy(preset.dt));
     {
-        float tw = stb_easy_font_width(buf) * s;
-        r.draw_text(buf, w * 0.75f - tw * 0.5f, h * 0.5f + 100.0f, s,
-                    0.7f, 0.7f, 0.7f, w, h);
+        const char* label = "With Damping";
+        float tw = stb_easy_font_width(const_cast<char*>(label)) * s;
+        r.draw_text(label, w * 0.5f - tw * 0.5f, h * 0.5f + 8.0f, s,
+                    0.6f, 0.6f, 0.6f, w, h);
     }
 
     // Controls hint at bottom
@@ -267,6 +309,8 @@ int main() {
             while (app.accumulator >= preset.dt) {
                 app.euler.step(preset.dt);
                 app.verlet.step(preset.dt);
+                app.euler_damped.step(preset.dt);
+                app.verlet_damped.step(preset.dt);
                 app.accumulator -= preset.dt;
             }
         }
