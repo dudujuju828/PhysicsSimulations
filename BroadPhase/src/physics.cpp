@@ -10,6 +10,10 @@ void PhysicsWorld::update(float dt, float speed_mult, float world_w, float world
         s.pos += s.vel * eff_dt;
         s.rotation += 0.5f * eff_dt;
 
+        // Sync world verts with new pos+rotation before computing AABB
+        if (s.type != ShapeType::Circle)
+            s.update_world_verts();
+
         // Compute shape extent for wall bounce
         AABB box = s.compute_aabb();
         float half_w = (box.max.x - box.min.x) * 0.5f;

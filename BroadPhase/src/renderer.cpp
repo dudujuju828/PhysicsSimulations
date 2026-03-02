@@ -602,6 +602,12 @@ void Renderer::render_stats(const UIState& ui, int win_w, int win_h) {
             std::snprintf(buf, sizeof(buf), "BVH saves: %.0f%%", 100.0f - ratio);
             draw_text(buf, x, y, s, 0.4f, 0.9f, 0.4f, win_w, win_h); y += line_h;
         }
+
+        if (ui.bvh_mismatch) {
+            draw_text("BVH MISMATCH!", x, y, s, 1.0f, 0.2f, 0.2f, win_w, win_h); y += line_h;
+        } else if (ui.use_bvh) {
+            draw_text("BVH verified OK", x, y, s, 0.3f, 0.7f, 0.3f, win_w, win_h); y += line_h;
+        }
     }
 
     if (ui.show_narrow_phase) {

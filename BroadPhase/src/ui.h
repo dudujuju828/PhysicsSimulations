@@ -39,6 +39,7 @@ struct UIState {
     int   false_positives     = 0;
     int   bvh_node_count      = 0;
     float fps                 = 0.0f;
+    bool  bvh_mismatch        = false;
 };
 
 struct Slider {

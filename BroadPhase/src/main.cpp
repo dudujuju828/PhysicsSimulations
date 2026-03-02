@@ -328,10 +328,21 @@ int main() {
         }
         app.ui.broad_phase_pairs = static_cast<int>(app.broad_pairs.size());
 
-        // Brute force (for comparison layer)
+        // Brute force (for comparison layer + BVH verification)
         if (app.ui.show_brute_compare) {
             app.brute_pairs = brute_force_pairs(app.aabbs);
             app.ui.brute_force_pairs = static_cast<int>(app.brute_pairs.size());
+
+            // Verify BVH produces same pair set as brute force
+            if (app.ui.use_bvh) {
+                auto bvh_sorted = app.broad_pairs;
+                auto bf_sorted = app.brute_pairs;
+                std::sort(bvh_sorted.begin(), bvh_sorted.end());
+                std::sort(bf_sorted.begin(), bf_sorted.end());
+                app.ui.bvh_mismatch = (bvh_sorted != bf_sorted);
+            } else {
+                app.ui.bvh_mismatch = false;
+            }
         }
 
         // Narrow phase
